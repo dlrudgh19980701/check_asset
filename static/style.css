@@ -1,0 +1,52 @@
+body {
+
+    background: #111;
+    color: white;
+
+    font-family: Arial;
+
+    max-width: 700px;
+
+    margin: auto;
+
+    padding: 20px;
+}
+
+.card {
+
+    background: #222;
+
+    border-radius: 12px;
+
+    padding: 20px;
+
+    margin-bottom: 20px;
+}
+
+input {
+
+    width: 100%;
+
+    padding: 10px;
+
+    margin-bottom: 10px;
+
+    box-sizing: border-box;
+}
+
+button {
+
+    width: 100%;
+
+    padding: 12px;
+}
+
+table {
+
+    width: 100%;
+}
+
+a {
+
+    color: red;
+}

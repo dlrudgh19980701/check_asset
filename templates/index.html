@@ -1,0 +1,494 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+
+<meta charset="utf-8">
+
+<meta name="viewport" content="width=device-width, initial-scale=1">
+
+<link
+rel="stylesheet"
+href="{{ url_for('static', filename='style.css') }}">
+
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+
+<script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-datalabels@2"></script>
+
+<title>My Portfolio</title>
+
+</head>
+
+<body>
+
+<h1>💰 My Portfolio</h1>
+
+
+<div class="card">
+
+<h2>총 자산</h2>
+
+<h1>
+{{ "{:,.0f}".format(total_asset) }} 원
+</h1>
+
+</div>
+
+
+<div class="card">
+
+<h2>📊 투자 현황</h2>
+
+<p>
+총 투자금 :
+{{ "{:,.0f}".format(total_investment) }} 원
+</p>
+
+<p>
+총 평가금 :
+{{ "{:,.0f}".format(stock_total) }} 원
+</p>
+
+<p>
+
+총 손익 :
+
+{% if total_profit >= 0 %}
+
+<span style="color:green;">
++{{ "{:,.0f}".format(total_profit) }} 원
+</span>
+
+{% else %}
+
+<span style="color:red;">
+{{ "{:,.0f}".format(total_profit) }} 원
+</span>
+
+{% endif %}
+
+</p>
+
+<p>
+
+총 수익률 :
+
+{% if total_profit_rate >= 0 %}
+
+<span style="color:green;">
++{{ "%.2f"|format(total_profit_rate) }}%
+</span>
+
+{% else %}
+
+<span style="color:red;">
+{{ "%.2f"|format(total_profit_rate) }}%
+</span>
+
+{% endif %}
+
+</p>
+
+</div>
+
+
+<div class="card">
+
+<h2>🥧 포트폴리오 비중</h2>
+
+<canvas
+id="portfolioChart"
+style="max-width:700px;">
+</canvas>
+
+</div>
+
+
+<div class="card">
+
+<h2>💵 USD/KRW 환율</h2>
+
+<h3>
+1 USD = {{ "%.2f"|format(usdkrw) }} KRW
+</h3>
+
+</div>
+
+
+<div class="card">
+
+<h2>업비트 자산</h2>
+
+<h3>
+{{ "{:,.0f}".format(crypto.total) }} 원
+</h3>
+
+{% for asset in crypto.assets %}
+
+<p>
+{{ asset.name }}
+:
+{{ "{:,.0f}".format(asset.evaluation) }}
+원
+</p>
+
+{% endfor %}
+
+</div>
+
+
+<div class="card">
+
+<h2>주식 추가</h2>
+
+<form
+action="/add_stock"
+method="post">
+
+<select name="market">
+
+<option value="US">
+🇺🇸 미국
+</option>
+
+<option value="KR">
+🇰🇷 한국
+</option>
+
+</select>
+
+<br><br>
+
+<input
+name="ticker"
+placeholder="AAPL 또는 005930"
+required>
+
+<input
+name="quantity"
+type="number"
+step="0.01"
+placeholder="수량"
+required>
+
+<input
+name="buy_price"
+type="number"
+step="0.01"
+placeholder="매수가"
+required>
+
+<input
+name="category"
+placeholder="미국주식 / 한국주식 / 현금"
+required>
+
+<button type="submit">
+저장
+</button>
+
+</form>
+
+</div>
+
+
+<div class="card">
+
+<h2>보유 주식</h2>
+
+<table>
+
+<tr>
+<th>시장</th>
+<th>카테고리</th>
+<th>종목</th>
+<th>수량</th>
+<th>매수가</th>
+<th>현재가</th>
+<th>수익률</th>
+<th>평가금액</th>
+<th>삭제</th>
+</tr>
+
+{% for stock in stocks %}
+
+<tr>
+
+<td>
+
+{% if stock.market == "US" %}
+🇺🇸
+{% else %}
+🇰🇷
+{% endif %}
+
+</td>
+
+<td>
+{{ stock.category }}
+</td>
+
+<td>
+
+{{ stock.name }}
+
+<br>
+
+<small>
+{{ stock.ticker }}
+</small>
+
+</td>
+
+<td>
+{{ stock.quantity }}
+</td>
+
+<td>
+
+{% if stock.market == "US" %}
+
+${{ "%.2f"|format(stock.buy_price) }}
+
+{% else %}
+
+{{ "{:,.0f}".format(stock.buy_price) }}원
+
+{% endif %}
+
+</td>
+
+<td>
+
+{% if stock.market == "US" %}
+
+${{ "%.2f"|format(stock.current_price) }}
+
+{% else %}
+
+{{ "{:,.0f}".format(stock.current_price) }}원
+
+{% endif %}
+
+</td>
+
+<td>
+
+{% if stock.profit >= 0 %}
+
+<span style="color:lime;">
++{{ "%.2f"|format(stock.profit) }}%
+</span>
+
+{% else %}
+
+<span style="color:red;">
+{{ "%.2f"|format(stock.profit) }}%
+</span>
+
+{% endif %}
+
+</td>
+
+<td>
+
+{{ "{:,.0f}".format(stock.evaluation) }}
+
+원
+
+</td>
+
+<td>
+
+<a
+href="/delete_stock/{{ stock.id }}"
+onclick="return confirm('삭제하시겠습니까?')">
+
+삭제
+
+</a>
+
+</td>
+
+</tr>
+
+{% endfor %}
+
+</table>
+
+</div>
+
+
+<script>
+
+const labels = {{ chart_labels|tojson }};
+const values = {{ chart_values|tojson }};
+
+const total = values.reduce(
+    (a, b) => a + b,
+    0
+);
+
+const legendLabels = labels.map(
+    (label, index) => {
+
+        const percent =
+            (
+                values[index]
+                / total
+            ) * 100;
+
+        return (
+            label
+            + " "
+            + percent.toFixed(1)
+            + "%"
+        );
+    }
+);
+
+Chart.register(
+    ChartDataLabels
+);
+
+new Chart(
+
+    document.getElementById(
+        "portfolioChart"
+    ),
+
+    {
+
+        type: "doughnut",
+
+        data: {
+
+            labels: legendLabels,
+
+            datasets: [{
+
+                data: values
+
+            }]
+        },
+
+        options: {
+
+            responsive: true,
+
+            plugins: {
+
+                legend: {
+
+                    position: "bottom"
+
+                },
+
+                datalabels: {
+
+                    color: "white",
+
+                    font: {
+
+                        weight: "bold",
+
+                        size: 14
+
+                    },
+
+                    formatter: (
+                        value
+                    ) => {
+
+                        const percent =
+                            (
+                                value
+                                / total
+                            ) * 100;
+
+                        return (
+                            percent.toFixed(1)
+                            + "%"
+                        );
+                    }
+                }
+            }
+        }
+    }
+);
+
+</script>
+
+</body>
+
+</html>
+
+<div class="card">
+
+<h2>💰 수동 자산 (현금 / 예금)</h2>
+
+<h3>
+{{ "{:,.0f}".format(manual_total) }} 원
+</h3>
+
+<!-- 입력 -->
+<form action="/add_manual_asset" method="post">
+
+<input
+name="name"
+placeholder="예: 현금 / 예금 / 비상금"
+required>
+
+<input
+name="amount"
+type="number"
+step="0.01"
+placeholder="금액"
+required>
+
+<br><br>
+
+<select name="currency">
+
+<option value="KRW">
+원화 (KRW)
+</option>
+
+<option value="USD">
+달러 (USD)
+</option>
+
+</select>
+
+<input type="hidden" name="category" value="현금">
+
+<button type="submit">
+추가
+</button>
+
+</form>
+
+<hr>
+
+<!-- 리스트 -->
+{% for asset in manual_assets %}
+
+<p>
+{{ asset.name }} :
+
+{% if asset.currency == "USD" %}
+
+${{ "{:,.2f}".format(asset.amount) }}
+
+{% else %}
+
+{{ "{:,.0f}".format(asset.amount) }} 원
+
+{% endif %}
+
+<a href="/delete_manual_asset/{{ asset.id }}">삭제</a>
+</p>
+
+{% endfor %}
+
+</div>
