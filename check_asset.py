@@ -15,6 +15,16 @@ def get_asset_data():
 
     balances = upbit.get_balances()
 
+    print("BALANCES =", balances)
+    
+    if not isinstance(balances, list):
+
+        return {
+            "total": 0,
+            "investment": 0,
+            "assets": []
+        }
+    
     total = 0
 
     assets = []
