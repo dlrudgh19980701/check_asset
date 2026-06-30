@@ -46,7 +46,7 @@ href="{{ url_for('static', filename='style.css') }}">
 
 <p>
 총 평가금 :
-{{ "{:,.0f}".format(stock_total) }} 원
+{{ "{:,.0f}".format(portfolio_evaluation) }} 원
 </p>
 
 <p>
@@ -114,27 +114,6 @@ style="max-width:700px;">
 
 </div>
 
-
-<div class="card">
-
-<h2>업비트 자산</h2>
-
-<h3>
-{{ "{:,.0f}".format(crypto.total) }} 원
-</h3>
-
-{% for asset in crypto.assets %}
-
-<p>
-{{ asset.name }}
-:
-{{ "{:,.0f}".format(asset.evaluation) }}
-원
-</p>
-
-{% endfor %}
-
-</div>
 
 
 <div class="card">
@@ -436,7 +415,7 @@ new Chart(
 
 <input
 name="name"
-placeholder="예: 현금 / 예금 / 비상금"
+placeholder="예: CMA / 비상금 / 비트코인"
 required>
 
 <input
@@ -458,6 +437,14 @@ required>
 달러 (USD)
 </option>
 
+<option value="BTC">
+비트코인 (BTC)
+</option>
+
+<option value="ETH">
+이더리움 (ETH)
+</option>
+
 </select>
 
 <input type="hidden" name="category" value="현금">
@@ -474,11 +461,20 @@ required>
 {% for asset in manual_assets %}
 
 <p>
+
 {{ asset.name }} :
 
 {% if asset.currency == "USD" %}
 
 ${{ "{:,.2f}".format(asset.amount) }}
+
+{% elif asset.currency == "BTC" %}
+
+{{ "%.8f"|format(asset.amount) }} BTC
+
+{% elif asset.currency == "ETH" %}
+
+{{ "%.6f"|format(asset.amount) }} ETH
 
 {% else %}
 
@@ -486,8 +482,21 @@ ${{ "{:,.2f}".format(asset.amount) }}
 
 {% endif %}
 
-<a href="/delete_manual_asset/{{ asset.id }}">삭제</a>
+<br>
+
+≈ {{ "{:,.0f}".format(asset.evaluation) }} 원
+
+<br>
+
+<a
+href="/delete_manual_asset/{{ asset.id }}"
+onclick="return confirm('삭제하시겠습니까?')">
+삭제
+</a>
+
 </p>
+
+<hr>
 
 {% endfor %}
 

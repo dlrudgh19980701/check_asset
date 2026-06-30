@@ -14,7 +14,10 @@ from db import (
     delete_manual_asset
 )
 
-from check_asset import get_asset_data
+from crypto_price import (
+    get_btc_price,
+    get_eth_price
+)
 
 from stock_price import (
     get_current_price,
@@ -28,11 +31,13 @@ app = Flask(__name__)
 @app.route("/")
 def home():
 
-    crypto = get_asset_data()
-
     stocks = get_stocks()
 
     usdkrw = get_usdkrw()
+
+    btc_price = get_btc_price() or 0
+
+    eth_price = get_eth_price() or 0
 
     manual_assets = get_manual_assets()
 
@@ -158,14 +163,30 @@ def home():
 
         currency = asset[3]
 
-        if currency == "USD":
-            amount_krw = (
-                amount
-                * usdkrw
-            )
+        if currency == "KRW":
+
+            amount_krw = amount
+            category = "현금"
+
+        elif currency == "USD":
+
+            amount_krw = amount * usdkrw
+            category = "달러"
+
+        elif currency == "BTC":
+
+            amount_krw = amount * btc_price
+            category = "비트코인"
+
+        elif currency == "ETH":
+
+            amount_krw = amount * eth_price
+            category = "이더리움"
 
         else:
+
             amount_krw = amount
+            category = "기타"
 
         manual_total += amount_krw
 
@@ -177,35 +198,17 @@ def home():
 
             "amount": amount,
 
-            "currency": currency
+            "currency": currency,
+
+            "evaluation": amount_krw
+
         })
-
-        if "현금" not in category_totals:
-
-            category_totals[
-                "현금"
-            ] = 0
-
-        category_totals[
-            "현금"
-        ] += amount_krw
-
-    # -------------------------
-    # 업비트 자산 처리
-    # -------------------------
-    for asset in crypto["assets"]:
-
-        category = asset["category"]
 
         if category not in category_totals:
 
-            category_totals[
-                category
-            ] = 0
+            category_totals[category] = 0
 
-        category_totals[
-            category
-        ] += asset["evaluation"]
+        category_totals[category] += amount_krw
 
     # -------------------------
     # 차트 데이터
@@ -230,23 +233,11 @@ def home():
     # -------------------------
     # 전체 계산
     # -------------------------
-    crypto_investment = crypto[
-        "investment"
-    ]
-
-    portfolio_investment = (
-
-        total_investment
-
-        + crypto_investment
-
-    )
+    portfolio_investment = total_investment
 
     portfolio_evaluation = (
 
         stock_total
-
-        + crypto["total"]
 
         + manual_total
 
@@ -283,7 +274,6 @@ def home():
 
         "index.html",
 
-        crypto=crypto,
 
         stocks=stock_assets,
 
@@ -301,7 +291,7 @@ def home():
 
         total_profit_rate=total_profit_rate,
 
-        stock_total=portfolio_evaluation,
+        portfolio_evaluation=portfolio_evaluation,
 
         chart_labels=chart_labels,
 
