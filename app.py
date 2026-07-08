@@ -6,6 +6,7 @@ from flask import (
 )
 
 from db import (
+    init_db,
     add_stock,
     get_stocks,
     delete_stock,
@@ -26,7 +27,7 @@ from stock_price import (
 )
 
 app = Flask(__name__)
-
+init_db()
 
 @app.route("/")
 def home():
@@ -411,14 +412,10 @@ def delete_manual_asset_route(asset_id):
     return redirect("/")
 
 
+import os
+
 if __name__ == "__main__":
-
     app.run(
-
         host="0.0.0.0",
-
-        port=5000,
-
-        debug=True
-
+        port=int(os.environ.get("PORT", 5000))
     )

@@ -1,10 +1,12 @@
+import os
 import sqlite3
+import psycopg
 
-DB_NAME = "portfolio.db"
+DATABASE_URL = os.environ["DATABASE_URL"]
 
 
 def get_connection():
-    return sqlite3.connect(DB_NAME)
+    return psycopg.connect(DATABASE_URL)
 
 
 # =========================
@@ -12,37 +14,34 @@ def get_connection():
 # =========================
 def init_db():
 
-    conn = get_connection()
-    cursor = conn.cursor()
+    with get_connection() as conn:
+        with conn.cursor() as cursor:
 
-    # -------------------------
-    # 주식
-    # -------------------------
-    cursor.execute("""
-    CREATE TABLE IF NOT EXISTS stocks (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        market TEXT NOT NULL,
-        ticker TEXT NOT NULL,
-        quantity REAL NOT NULL,
-        buy_price REAL NOT NULL,
-        category TEXT NOT NULL
-    )
-    """)
+            # -------------------------
+            # 주식
+            # -------------------------
+            cursor.execute("""
+            CREATE TABLE IF NOT EXISTS stocks (
+                id SERIAL PRIMARY KEY,
+                market TEXT NOT NULL,
+                ticker TEXT NOT NULL,
+                quantity DOUBLE PRECISION NOT NULL,
+                buy_price DOUBLE PRECISION NOT NULL,
+                category TEXT NOT NULL
+            )
+            """)
 
-    # -------------------------
-    # 수동 자산
-    # -------------------------
-    cursor.execute("""
-    CREATE TABLE IF NOT EXISTS manual_assets (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        name TEXT NOT NULL,
-        amount REAL NOT NULL,
-        currency TEXT NOT NULL
-    )
-    """)
-
-    conn.commit()
-    conn.close()
+            # -------------------------
+            # 수동 자산
+            # -------------------------
+            cursor.execute("""
+            CREATE TABLE IF NOT EXISTS manual_assets (
+                id SERIAL PRIMARY KEY,
+                name TEXT NOT NULL,
+                amount DOUBLE PRECISION NOT NULL,
+                currency TEXT NOT NULL
+            )
+            """)
 
 
 # =========================
@@ -56,67 +55,57 @@ def add_stock(
     category
 ):
 
-    conn = get_connection()
-    cursor = conn.cursor()
+    with get_connection() as conn:
+        with conn.cursor() as cursor:
 
-    cursor.execute("""
-    INSERT INTO stocks
-    (
-        market,
-        ticker,
-        quantity,
-        buy_price,
-        category
-    )
-    VALUES (?, ?, ?, ?, ?)
-    """, (
-        market,
-        ticker,
-        quantity,
-        buy_price,
-        category
-    ))
-
-    conn.commit()
-    conn.close()
+            cursor.execute("""
+            INSERT INTO stocks
+            (
+                market,
+                ticker,
+                quantity,
+                buy_price,
+                category
+            )
+            VALUES (%s, %s, %s, %s, %s)
+            """, (
+                market,
+                ticker,
+                quantity,
+                buy_price,
+                category
+            ))
 
 
 def get_stocks():
 
-    conn = get_connection()
-    cursor = conn.cursor()
+    with get_connection() as conn:
+        with conn.cursor() as cursor:
 
-    cursor.execute("""
-    SELECT
-        id,
-        market,
-        ticker,
-        quantity,
-        buy_price,
-        category
-    FROM stocks
-    ORDER BY id DESC
-    """)
+            cursor.execute("""
+            SELECT
+                id,
+                market,
+                ticker,
+                quantity,
+                buy_price,
+                category
+            FROM stocks
+            ORDER BY id DESC
+            """)
 
-    data = cursor.fetchall()
-
-    conn.close()
-
-    return data
+            return cursor.fetchall()
 
 
 def delete_stock(stock_id):
 
-    conn = get_connection()
-    cursor = conn.cursor()
+    with get_connection() as conn:
+        with conn.cursor() as cursor:
 
-    cursor.execute("""
-    DELETE FROM stocks
-    WHERE id=?
-    """, (stock_id,))
-
-    conn.commit()
-    conn.close()
+            cursor.execute("""
+            DELETE FROM stocks
+            WHERE id=%s
+            """, (stock_id,))
 
 
 # =========================
@@ -128,58 +117,48 @@ def add_manual_asset(
     currency
 ):
 
-    conn = get_connection()
-    cursor = conn.cursor()
+    with get_connection() as conn:
+        with conn.cursor() as cursor:
 
-    cursor.execute("""
-    INSERT INTO manual_assets
-    (
-        name,
-        amount,
-        currency
-    )
-    VALUES (?, ?, ?)
-    """, (
-        name,
-        amount,
-        currency
-    ))
-
-    conn.commit()
-    conn.close()
+            cursor.execute("""
+            INSERT INTO manual_assets
+            (
+                name,
+                amount,
+                currency
+            )
+            VALUES (%s, %s, %s)
+            """, (
+                name,
+                amount,
+                currency
+            ))
 
 
 def get_manual_assets():
 
-    conn = get_connection()
-    cursor = conn.cursor()
+    with get_connection() as conn:
+        with conn.cursor() as cursor:
 
-    cursor.execute("""
-    SELECT
-        id,
-        name,
-        amount,
-        currency
-    FROM manual_assets
-    ORDER BY id DESC
-    """)
+            cursor.execute("""
+            SELECT
+                id,
+                name,
+                amount,
+                currency
+            FROM manual_assets
+            ORDER BY id DESC
+            """)
 
-    data = cursor.fetchall()
-
-    conn.close()
-
-    return data
+            return cursor.fetchall()
 
 
 def delete_manual_asset(asset_id):
 
-    conn = get_connection()
-    cursor = conn.cursor()
+    with get_connection() as conn:
+        with conn.cursor() as cursor:
 
-    cursor.execute("""
-    DELETE FROM manual_assets
-    WHERE id=?
-    """, (asset_id,))
-
-    conn.commit()
-    conn.close()
+            cursor.execute("""
+            DELETE FROM manual_assets
+            WHERE id=%s
+            """, (asset_id,))

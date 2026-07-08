@@ -4,3 +4,4 @@ yfinance
 pyupbit
 pandas
 requests
+psycopg[binary]
