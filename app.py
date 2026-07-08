@@ -172,7 +172,7 @@ def home():
         elif currency == "USD":
 
             amount_krw = amount * usdkrw
-            category = "달러"
+            category = "현금"
 
         elif currency == "BTC":
 
