@@ -2,7 +2,30 @@ import os
 import sqlite3
 import psycopg
 
-DATABASE_URL = os.environ["DATABASE_URL"]
+# Load .env automatically in development (optional). If a `.env` file
+# exists in the project root, `load_dotenv()` will populate environment
+# variables before we read `DATABASE_URL`.
+try:
+    from dotenv import load_dotenv
+    load_dotenv()
+except Exception:
+    # python-dotenv is optional in production; continue if it's missing.
+    pass
+
+# Prefer an explicit environment variable, but give a clear error if missing
+# to avoid an unhelpful KeyError. For local development you can set
+# DATABASE_URL to a Postgres URL (recommended) or to a sqlite URL
+# like "sqlite:///data.db".
+DATABASE_URL = os.environ.get("DATABASE_URL")
+if not DATABASE_URL:
+    raise RuntimeError(
+        "Environment variable DATABASE_URL is not set.\n"
+        "Set it before running the app (example):\n"
+        "  PowerShell: $env:DATABASE_URL='postgresql://user:pass@host:5432/dbname'\n"
+        "  CMD: set DATABASE_URL=postgresql://user:pass@host:5432/dbname\n"
+        "Or create a .env file and add DATABASE_URL there (see .env.example).\n"
+        "For a quick local fallback you may set: DATABASE_URL=sqlite:///data.db"
+    )
 
 
 def get_connection():
@@ -97,6 +120,38 @@ def get_stocks():
             return cursor.fetchall()
 
 
+def get_stock_by_market_and_ticker(market, ticker):
+
+    with get_connection() as conn:
+        with conn.cursor() as cursor:
+
+            cursor.execute("""
+            SELECT
+                id,
+                market,
+                ticker,
+                quantity,
+                buy_price,
+                category
+            FROM stocks
+            WHERE market=%s AND ticker=%s
+            """, (market, ticker))
+
+            return cursor.fetchone()
+
+
+def update_stock_quantity_and_price(stock_id, new_quantity, new_buy_price, category):
+
+    with get_connection() as conn:
+        with conn.cursor() as cursor:
+
+            cursor.execute("""
+            UPDATE stocks
+            SET quantity=%s, buy_price=%s, category=%s
+            WHERE id=%s
+            """, (new_quantity, new_buy_price, category, stock_id))
+
+
 def delete_stock(stock_id):
 
     with get_connection() as conn:
@@ -133,6 +188,46 @@ def add_manual_asset(
                 amount,
                 currency
             ))
+
+
+def get_manual_asset(asset_id):
+
+    with get_connection() as conn:
+        with conn.cursor() as cursor:
+
+            cursor.execute("""
+            SELECT id, name, amount, currency
+            FROM manual_assets
+            WHERE id=%s
+            """, (asset_id,))
+
+            return cursor.fetchone()
+
+
+def get_manual_asset_by_name_currency(name, currency):
+
+    with get_connection() as conn:
+        with conn.cursor() as cursor:
+
+            cursor.execute("""
+            SELECT id, name, amount, currency
+            FROM manual_assets
+            WHERE name=%s AND currency=%s
+            """, (name, currency))
+
+            return cursor.fetchone()
+
+
+def update_manual_asset_amount(asset_id, new_amount):
+
+    with get_connection() as conn:
+        with conn.cursor() as cursor:
+
+            cursor.execute("""
+            UPDATE manual_assets
+            SET amount=%s
+            WHERE id=%s
+            """, (new_amount, asset_id))
 
 
 def get_manual_assets():

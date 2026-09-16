@@ -5,3 +5,4 @@ pyupbit
 pandas
 requests
 psycopg[binary]
+python-dotenv

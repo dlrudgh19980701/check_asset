@@ -14,6 +14,13 @@ from db import (
     get_manual_assets,
     delete_manual_asset
 )
+from db import get_manual_asset_by_name_currency
+from db import (
+    get_stock_by_market_and_ticker,
+    update_stock_quantity_and_price,
+    get_manual_asset,
+    update_manual_asset_amount
+)
 
 from crypto_price import (
     get_btc_price,
@@ -388,11 +395,130 @@ def add_manual_asset_route():
         "currency"
     ]
 
-    add_manual_asset(
-        name,
-        amount,
-        currency
-    )
+    # If same name+currency exists, sum the amounts instead of creating duplicate
+    existing = get_manual_asset_by_name_currency(name, currency)
+    if existing:
+        asset_id = existing[0]
+        old_amount = existing[2]
+        new_amount = old_amount + amount
+        update_manual_asset_amount(asset_id, new_amount)
+    else:
+        add_manual_asset(
+            name,
+            amount,
+            currency
+        )
+
+    return redirect("/")
+
+
+# -------------------------
+# 주식 매수/매도
+# -------------------------
+@app.route(
+    "/trade",
+    methods=["POST"]
+)
+def trade_route():
+
+    action = request.form["action"]  # 'buy' or 'sell'
+
+    market = request.form["market"]
+
+    ticker = request.form["ticker"]
+
+    quantity = float(request.form["quantity"])
+
+    price = float(request.form["price"])  # unit price entered by user
+
+    category = request.form.get("category", "")
+
+    source_id = int(request.form.get("source_id", "0") or "0")
+
+    source = None
+    source_amount = None
+    source_currency = None
+
+    if source_id != 0:
+        source = get_manual_asset(source_id)
+        if not source:
+            return redirect("/")
+        source_amount = source[2]
+        source_currency = source[3]
+
+    usdkrw = get_usdkrw()
+
+    # cost/proceed calculation is only needed when we update a manual asset
+    cost = None
+    if source is not None:
+        # cost/proceed in source currency
+        if market == "US":
+            # price is in USD
+            if source_currency == "USD":
+                cost = quantity * price
+            else:
+                cost = quantity * price * usdkrw
+        else:
+            # KR market, price in KRW
+            if source_currency == "KRW":
+                cost = quantity * price
+            else:
+                # convert source currency to KRW for simplicity
+                if source_currency == "USD":
+                    cost = quantity * price / usdkrw
+                else:
+                    # other currencies not supported for trade
+                    return redirect("/")
+
+    # BUY
+    if action == "buy":
+
+        # if a source is provided, check and deduct funds
+        if source is not None:
+            if source_amount < cost:
+                return redirect("/")
+
+            # deduct funds
+            new_source_amount = source_amount - cost
+            update_manual_asset_amount(source_id, new_source_amount)
+
+        # add or update stock
+        existing = get_stock_by_market_and_ticker(market, ticker)
+        if existing:
+            stock_id = existing[0]
+            old_qty = existing[3]
+            old_price = existing[4]
+            new_qty = old_qty + quantity
+            # weighted average buy price
+            new_buy_price = ((old_qty * old_price) + (quantity * price)) / new_qty
+            update_stock_quantity_and_price(stock_id, new_qty, new_buy_price, category)
+        else:
+            add_stock(market, ticker, quantity, price, category or "주식")
+
+    # SELL
+    elif action == "sell":
+
+        existing = get_stock_by_market_and_ticker(market, ticker)
+        if not existing:
+            return redirect("/")
+
+        stock_id = existing[0]
+        old_qty = existing[3]
+        if old_qty < quantity:
+            return redirect("/")
+
+        # reduce stock
+        remaining = old_qty - quantity
+        if remaining <= 0:
+            delete_stock(stock_id)
+        else:
+            # preserve existing category when selling
+            update_stock_quantity_and_price(stock_id, remaining, existing[4], existing[5])
+
+        # credit funds (only if a source account was selected)
+        if source is not None:
+            new_source_amount = source_amount + cost
+            update_manual_asset_amount(source_id, new_source_amount)
 
     return redirect("/")
 

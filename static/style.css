@@ -1,52 +1,91 @@
-body {
-
-    background: #111;
-    color: white;
-
-    font-family: Arial;
-
-    max-width: 700px;
-
-    margin: auto;
-
-    padding: 20px;
+:root{
+    --bg:#0f1720;
+    --card:#0f1728;
+    --muted:#9ca3af;
+    --accent:#06b6d4;
+    --accent-2:#7c3aed;
+    --danger:#ef4444;
 }
 
-.card {
+*{box-sizing:border-box}
 
-    background: #222;
+body{
+    background: linear-gradient(180deg,var(--bg) 0%, #071227 100%);
+    color: #e6eef6;
+    font-family: -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
+    max-width: 980px;
+    margin: 24px auto;
+    padding: 24px;
+}
 
+h1{
+    font-size: 28px;
+    margin: 0 0 18px 0;
+    display:flex;
+    align-items:center;
+    gap:12px;
+}
+
+.card{
+    background: linear-gradient(180deg, rgba(255,255,255,0.02), rgba(255,255,255,0.01));
+    border: 1px solid rgba(255,255,255,0.04);
     border-radius: 12px;
-
-    padding: 20px;
-
-    margin-bottom: 20px;
+    padding: 18px;
+    margin-bottom: 16px;
+    box-shadow: 0 6px 18px rgba(2,6,23,0.6);
 }
 
-input {
+.card h2{font-size:16px;margin:0 0 8px 0;color:var(--muted)}
+.card h3{margin:0 0 12px 0}
 
-    width: 100%;
+.top-row{display:flex;gap:12px;flex-wrap:wrap}
+.top-row .card{flex:1;min-width:220px}
 
-    padding: 10px;
-
-    margin-bottom: 10px;
-
-    box-sizing: border-box;
+/* Portfolio chart: make the middle card larger and increase canvas height */
+.top-row .card:nth-child(2){
+    flex:1.6; /* give portfolio card more space */
+    min-width:320px;
 }
 
-button {
-
-    width: 100%;
-
-    padding: 12px;
+#portfolioChart{
+    width:100% !important;
+    height:320px !important;
+    max-height:420px;
+    display:block;
 }
 
-table {
-
-    width: 100%;
+@media(min-width:1200px){
+    #portfolioChart{height:420px !important}
 }
 
-a {
-
-    color: red;
+input,select,button{
+    width:100%;
+    padding:10px 12px;
+    border-radius:8px;
+    border:1px solid rgba(255,255,255,0.06);
+    background:transparent;
+    color:inherit;
+    margin-bottom:10px;
 }
+
+input::placeholder, select::placeholder{color:var(--muted)}
+
+button{
+    background: linear-gradient(90deg,var(--accent),var(--accent-2));
+    border:none;color:#042029;font-weight:600;cursor:pointer;padding:12px;border-radius:10px
+}
+
+table{width:100%;border-collapse:collapse}
+th,td{padding:10px 8px;text-align:left;border-bottom:1px solid rgba(255,255,255,0.03)}
+th{color:var(--muted);font-size:13px}
+tr:nth-child(even){background:rgba(255,255,255,0.01)}
+
+a{color:var(--danger);text-decoration:none}
+
+.small{font-size:12px;color:var(--muted)}
+
+.label-inline{display:flex;gap:8px;align-items:center}
+
+.muted{color:var(--muted)}
+
+@media(min-width:900px){body{padding:36px}}
