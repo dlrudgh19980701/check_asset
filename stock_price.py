@@ -3,12 +3,37 @@ import yfinance as yf
 import io
 import sys
 from contextlib import redirect_stdout, redirect_stderr
+import time
+import functools
+
+
+# Simple in-memory TTL cache decorator to avoid repeated external calls
+def ttl_cache(ttl_seconds: int):
+    def decorator(func):
+        cache = {}
+
+        @functools.wraps(func)
+        def wrapper(*args, **kwargs):
+            key = (args, tuple(sorted(kwargs.items())))
+            now = time.time()
+            if key in cache:
+                value, ts = cache[key]
+                if now - ts < ttl_seconds:
+                    return value
+            value = func(*args, **kwargs)
+            cache[key] = (value, now)
+            return value
+
+        return wrapper
+
+    return decorator
 
 # Reduce noisy logs from yfinance/urllib3 when a symbol is not found
 logging.getLogger("yfinance").setLevel(logging.ERROR)
 logging.getLogger("urllib3").setLevel(logging.WARNING)
 
 
+@ttl_cache(300)  # cache price for 5 minutes
 def get_current_price(market, ticker):
     try:
         if market == "KR":
@@ -47,6 +72,7 @@ def get_usdkrw():
         return 1400
 
 
+@ttl_cache(3600)  # cache stock name for 1 hour
 def get_stock_name(market, ticker):
     try:
         if market == "KR":
