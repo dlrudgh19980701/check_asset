@@ -1,70 +1,55 @@
+import logging
 import yfinance as yf
+import io
+import sys
+from contextlib import redirect_stdout, redirect_stderr
+
+# Reduce noisy logs from yfinance/urllib3 when a symbol is not found
+logging.getLogger("yfinance").setLevel(logging.ERROR)
+logging.getLogger("urllib3").setLevel(logging.WARNING)
 
 
-def get_current_price(
-    market,
-    ticker
-):
-
+def get_current_price(market, ticker):
     try:
-
         if market == "KR":
-
-            # 한국 주식
             ticker = ticker + ".KS"
 
-        stock = yf.Ticker(
-            ticker
-        )
+        stock = yf.Ticker(ticker)
+        buf_out = io.StringIO()
+        buf_err = io.StringIO()
+        with redirect_stdout(buf_out), redirect_stderr(buf_err):
+            data = stock.history(period="1d")
 
-        data = stock.history(
-            period="1d"
-        )
-
-        if len(data) == 0:
+        if data is None or len(data) == 0:
             return None
 
-        return float(
-            data["Close"].iloc[-1]
-        )
+        return float(data["Close"].iloc[-1])
 
     except Exception:
-
+        # swallow errors and return None so the app can skip delisted symbols
         return None
 
 
 def get_usdkrw():
-
     try:
+        ticker = yf.Ticker("USDKRW=X")
+        buf_out = io.StringIO()
+        buf_err = io.StringIO()
+        with redirect_stdout(buf_out), redirect_stderr(buf_err):
+            data = ticker.history(period="1d")
 
-        ticker = yf.Ticker(
-            "USDKRW=X"
-        )
-
-        data = ticker.history(
-            period="1d"
-        )
-
-        if len(data) == 0:
+        if data is None or len(data) == 0:
             return 1400
 
-        return float(
-            data["Close"].iloc[-1]
-        )
+        return float(data["Close"].iloc[-1])
 
     except Exception:
-
         return 1400
-    
-def get_stock_name(
-    market,
-    ticker
-):
 
+
+def get_stock_name(market, ticker):
     try:
-
         if market == "KR":
-
             kr_names = {
                 "005930": "삼성전자",
                 "000660": "SK하이닉스",
@@ -81,26 +66,17 @@ def get_stock_name(
                 "411060": "ACE KRX금현물",
                 "497570": "TIGER 필라델피아AI반도체나스닥",
                 "0151S0": "KODEX 미국AI반도체TOP3 플러스"
-
-
             }
 
-            return kr_names.get(
-                ticker,
-                ticker
-            )
+            return kr_names.get(ticker, ticker)
 
-        stock = yf.Ticker(
-            ticker
-        )
+        stock = yf.Ticker(ticker)
+        buf_out = io.StringIO()
+        buf_err = io.StringIO()
+        with redirect_stdout(buf_out), redirect_stderr(buf_err):
+            info = stock.info
 
-        info = stock.info
-
-        return info.get(
-            "shortName",
-            ticker
-        )
+        return info.get("shortName", ticker)
 
     except Exception:
-
         return ticker
