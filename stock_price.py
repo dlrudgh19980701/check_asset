@@ -5,6 +5,7 @@ import io
 import sys
 import requests
 import pandas as pd
+import threading
 from contextlib import redirect_stdout, redirect_stderr
 
 # Reduce noisy logs from yfinance/urllib3 when a symbol is not found
@@ -14,6 +15,10 @@ logging.getLogger("urllib3").setLevel(logging.WARNING)
 _US_RSI_CACHE = None
 _US_RSI_CACHE_AT = 0
 _US_RSI_CACHE_TTL = 900
+_US_RSI_REFRESHING = False
+_US_RSI_ERROR = None
+_US_RSI_RETRY_AT = 0
+_US_RSI_LOCK = threading.Lock()
 
 
 def get_current_price(market, ticker):
@@ -90,13 +95,30 @@ def get_stock_name(market, ticker):
 
 
 def get_us_large_cap_rsi():
-    global _US_RSI_CACHE, _US_RSI_CACHE_AT
+    global _US_RSI_REFRESHING, _US_RSI_ERROR
 
-    if (
-        _US_RSI_CACHE is not None
-        and time.monotonic() - _US_RSI_CACHE_AT < _US_RSI_CACHE_TTL
-    ):
-        return _US_RSI_CACHE
+    now = time.monotonic()
+    with _US_RSI_LOCK:
+        cache_is_fresh = (
+            _US_RSI_CACHE is not None
+            and now - _US_RSI_CACHE_AT < _US_RSI_CACHE_TTL
+        )
+
+        if not cache_is_fresh and not _US_RSI_REFRESHING and now >= _US_RSI_RETRY_AT:
+            _US_RSI_REFRESHING = True
+            _US_RSI_ERROR = None
+            threading.Thread(target=_refresh_us_large_cap_rsi, daemon=True).start()
+
+        return {
+            "groups": _US_RSI_CACHE or {"low": [], "high": []},
+            "loading": _US_RSI_REFRESHING,
+            "error": _US_RSI_ERROR,
+        }
+
+
+def _refresh_us_large_cap_rsi():
+    global _US_RSI_CACHE, _US_RSI_CACHE_AT
+    global _US_RSI_REFRESHING, _US_RSI_ERROR, _US_RSI_RETRY_AT
 
     try:
         response = requests.get(
@@ -109,7 +131,7 @@ def get_us_large_cap_rsi():
                 "count": 250,
             },
             headers={"User-Agent": "Mozilla/5.0"},
-            timeout=15,
+            timeout=10,
         )
         response.raise_for_status()
         result = response.json()["finance"]["result"][0]
@@ -137,7 +159,8 @@ def get_us_large_cap_rsi():
             interval="1d",
             auto_adjust=True,
             progress=False,
-            threads=True,
+            threads=4,
+            timeout=10,
         )
         close_prices = history["Close"]
         if isinstance(close_prices, pd.Series):
@@ -153,29 +176,40 @@ def get_us_large_cap_rsi():
             for quote in quotes
             if quote.get("symbol")
         }
+        market_cap_by_ticker = {
+            quote["symbol"]: quote["marketCap"]
+            for quote in quotes
+            if quote.get("symbol")
+        }
+
+        available_tickers = [
+            ticker for ticker in tickers if ticker in close_prices.columns
+        ]
+        close_prices = close_prices[available_tickers]
+        changes = close_prices.diff()
+        average_gains = changes.clip(lower=0).ewm(
+            alpha=1 / 14,
+            min_periods=14,
+            adjust=False,
+        ).mean()
+        average_losses = (-changes.clip(upper=0)).ewm(
+            alpha=1 / 14,
+            min_periods=14,
+            adjust=False,
+        ).mean()
+        relative_strength = average_gains / average_losses.replace(0, float("nan"))
+        rsi_values = 100 - (100 / (1 + relative_strength))
+        rsi_values = rsi_values.mask(average_losses == 0, 100)
 
         low_rsi = []
         high_rsi = []
 
         for rank, ticker in enumerate(tickers, start=1):
-            if ticker not in close_prices.columns:
+            if ticker not in rsi_values.columns:
                 continue
 
             close = close_prices[ticker].dropna()
-            change = close.diff()
-            average_gain = change.clip(lower=0).ewm(
-                alpha=1 / 14,
-                min_periods=14,
-                adjust=False,
-            ).mean()
-            average_loss = (-change.clip(upper=0)).ewm(
-                alpha=1 / 14,
-                min_periods=14,
-                adjust=False,
-            ).mean()
-            relative_strength = average_gain / average_loss.replace(0, float("nan"))
-            rsi = 100 - (100 / (1 + relative_strength))
-            rsi = rsi.mask(average_loss == 0, 100).dropna()
+            rsi = rsi_values[ticker].dropna()
 
             if rsi.empty:
                 continue
@@ -185,11 +219,7 @@ def get_us_large_cap_rsi():
                 "rank": rank,
                 "ticker": ticker,
                 "name": name_by_ticker.get(ticker, ticker),
-                "market_cap": next(
-                    quote["marketCap"]
-                    for quote in quotes
-                    if quote["symbol"] == ticker
-                ),
+                "market_cap": market_cap_by_ticker[ticker],
                 "price": float(close.iloc[-1]),
                 "rsi": latest_rsi,
             }
@@ -199,10 +229,17 @@ def get_us_large_cap_rsi():
             elif latest_rsi >= 60:
                 high_rsi.append(item)
 
-        _US_RSI_CACHE = {"low": low_rsi, "high": high_rsi}
-        _US_RSI_CACHE_AT = time.monotonic()
-        return _US_RSI_CACHE
+        with _US_RSI_LOCK:
+            _US_RSI_CACHE = {"low": low_rsi, "high": high_rsi}
+            _US_RSI_CACHE_AT = time.monotonic()
+            _US_RSI_ERROR = None
+            _US_RSI_RETRY_AT = 0
 
     except Exception as error:
         logging.exception("Unable to load US large-cap RSI data")
-        raise RuntimeError("미국 대형주 RSI 데이터를 불러오지 못했습니다.") from error
+        with _US_RSI_LOCK:
+            _US_RSI_ERROR = "미국 대형주 RSI 데이터를 불러오지 못했습니다."
+            _US_RSI_RETRY_AT = time.monotonic() + 60
+    finally:
+        with _US_RSI_LOCK:
+            _US_RSI_REFRESHING = False

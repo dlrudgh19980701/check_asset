@@ -62,6 +62,9 @@ href="{{ url_for('static', filename='style.css') }}">
 
 <h2>미국 시가총액 상위 100 RSI</h2>
 <p class="small">Yahoo Finance 기준 · 일봉 RSI(14)</p>
+<p id="us-rsi-status" class="small" aria-live="polite">
+    {% if us_rsi_loading %}최신 RSI 데이터를 불러오는 중입니다.{% endif %}
+</p>
 
 {% if us_rsi_error %}
 <p class="rsi-error">{{ us_rsi_error }}</p>
@@ -119,6 +122,29 @@ href="{{ url_for('static', filename='style.css') }}">
         {% endif %}
     </section>
 </div>
+{% endif %}
+
+{% if us_rsi_loading %}
+<script>
+const rsiStatusNode = document.getElementById("us-rsi-status");
+const rsiStatusPoll = setInterval(async () => {
+    try {
+        const response = await fetch("/us_rsi_status", {cache: "no-store"});
+        const status = await response.json();
+        if (status.loading) return;
+
+        clearInterval(rsiStatusPoll);
+        if (status.error) {
+            rsiStatusNode.textContent = status.error;
+            rsiStatusNode.classList.add("rsi-error");
+        } else {
+            window.location.reload();
+        }
+    } catch (error) {
+        rsiStatusNode.textContent = "RSI 데이터 상태를 확인하지 못했습니다.";
+    }
+}, 3000);
+</script>
 {% endif %}
 
 </div>

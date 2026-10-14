@@ -2,7 +2,8 @@ from flask import (
     Flask,
     render_template,
     request,
-    redirect
+    redirect,
+    jsonify,
 )
 
 from db import (
@@ -53,12 +54,7 @@ def home():
 
     manual_assets = get_manual_assets()
 
-    try:
-        us_rsi_groups = get_us_large_cap_rsi()
-        us_rsi_error = None
-    except RuntimeError as error:
-        us_rsi_groups = {"low": [], "high": []}
-        us_rsi_error = str(error)
+    us_rsi_state = get_us_large_cap_rsi()
 
     stock_assets = []
 
@@ -316,11 +312,19 @@ def home():
 
         chart_values=chart_values,
 
-        us_rsi_groups=us_rsi_groups,
+        us_rsi_groups=us_rsi_state["groups"],
 
-        us_rsi_error=us_rsi_error
+        us_rsi_error=us_rsi_state["error"],
+
+        us_rsi_loading=us_rsi_state["loading"]
 
     )
+
+
+@app.route("/us_rsi_status")
+def us_rsi_status():
+    state = get_us_large_cap_rsi()
+    return jsonify({"loading": state["loading"], "error": state["error"]})
 
 
 # -------------------------
