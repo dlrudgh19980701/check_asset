@@ -40,6 +40,9 @@ init_db()
 @app.route("/")
 def home():
 
+    if request.method == "HEAD":
+        return "", 200
+
     stocks = get_stocks()
 
     usdkrw = get_usdkrw()
