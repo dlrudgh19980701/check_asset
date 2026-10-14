@@ -2,8 +2,7 @@ from flask import (
     Flask,
     render_template,
     request,
-    redirect,
-    jsonify,
+    redirect
 )
 
 from db import (
@@ -31,8 +30,7 @@ from crypto_price import (
 from stock_price import (
     get_current_price,
     get_usdkrw,
-    get_stock_name,
-    get_us_large_cap_rsi,
+    get_stock_name
 )
 
 app = Flask(__name__)
@@ -40,9 +38,6 @@ init_db()
 
 @app.route("/")
 def home():
-
-    if request.method == "HEAD":
-        return "", 200
 
     stocks = get_stocks()
 
@@ -53,8 +48,6 @@ def home():
     eth_price = get_eth_price() or 0
 
     manual_assets = get_manual_assets()
-
-    us_rsi_state = get_us_large_cap_rsi()
 
     stock_assets = []
 
@@ -310,21 +303,9 @@ def home():
 
         chart_labels=chart_labels,
 
-        chart_values=chart_values,
-
-        us_rsi_groups=us_rsi_state["groups"],
-
-        us_rsi_error=us_rsi_state["error"],
-
-        us_rsi_loading=us_rsi_state["loading"]
+        chart_values=chart_values
 
     )
-
-
-@app.route("/us_rsi_status")
-def us_rsi_status():
-    state = get_us_large_cap_rsi()
-    return jsonify({"loading": state["loading"], "error": state["error"]})
 
 
 # -------------------------
