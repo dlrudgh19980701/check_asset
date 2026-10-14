@@ -1,4 +1,5 @@
 import logging
+import functools
 import time
 import yfinance as yf
 import io
@@ -21,6 +22,28 @@ _US_RSI_RETRY_AT = 0
 _US_RSI_LOCK = threading.Lock()
 
 
+def ttl_cache(ttl_seconds):
+    def decorator(func):
+        cache = {}
+
+        @functools.wraps(func)
+        def wrapper(*args, **kwargs):
+            key = (args, tuple(sorted(kwargs.items())))
+            now = time.monotonic()
+            cached = cache.get(key)
+            if cached and now - cached[1] < ttl_seconds:
+                return cached[0]
+
+            value = func(*args, **kwargs)
+            cache[key] = (value, now)
+            return value
+
+        return wrapper
+
+    return decorator
+
+
+@ttl_cache(300)
 def get_current_price(market, ticker):
     try:
         if market == "KR":
@@ -30,7 +53,7 @@ def get_current_price(market, ticker):
         buf_out = io.StringIO()
         buf_err = io.StringIO()
         with redirect_stdout(buf_out), redirect_stderr(buf_err):
-            data = stock.history(period="1d")
+            data = stock.history(period="1d", timeout=8)
 
         if data is None or len(data) == 0:
             return None
@@ -42,13 +65,14 @@ def get_current_price(market, ticker):
         return None
 
 
+@ttl_cache(300)
 def get_usdkrw():
     try:
         ticker = yf.Ticker("USDKRW=X")
         buf_out = io.StringIO()
         buf_err = io.StringIO()
         with redirect_stdout(buf_out), redirect_stderr(buf_err):
-            data = ticker.history(period="1d")
+            data = ticker.history(period="1d", timeout=8)
 
         if data is None or len(data) == 0:
             return 1400
@@ -59,6 +83,7 @@ def get_usdkrw():
         return 1400
 
 
+@ttl_cache(3600)
 def get_stock_name(market, ticker):
     try:
         if market == "KR":
@@ -82,13 +107,26 @@ def get_stock_name(market, ticker):
 
             return kr_names.get(ticker, ticker)
 
-        stock = yf.Ticker(ticker)
-        buf_out = io.StringIO()
-        buf_err = io.StringIO()
-        with redirect_stdout(buf_out), redirect_stderr(buf_err):
-            info = stock.info
+        response = requests.get(
+            "https://query1.finance.yahoo.com/v1/finance/search",
+            params={"q": ticker, "quotesCount": 5, "newsCount": 0},
+            headers={"User-Agent": "Mozilla/5.0"},
+            timeout=5,
+        )
+        response.raise_for_status()
+        matches = response.json().get("quotes", [])
+        exact_match = next(
+            (quote for quote in matches if quote.get("symbol") == ticker),
+            None,
+        )
+        if exact_match:
+            return (
+                exact_match.get("longname")
+                or exact_match.get("shortname")
+                or ticker
+            )
 
-        return info.get("shortName", ticker)
+        return ticker
 
     except Exception:
         return ticker
