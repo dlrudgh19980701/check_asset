@@ -58,6 +58,75 @@ href="{{ url_for('static', filename='style.css') }}">
 
 <div class="card">
 
+<div class="card">
+
+<h2>미국 시가총액 상위 100 RSI</h2>
+<p class="small">Yahoo Finance 기준 · 일봉 RSI(14)</p>
+
+{% if us_rsi_error %}
+<p class="rsi-error">{{ us_rsi_error }}</p>
+{% else %}
+<div class="rsi-grid">
+    <section class="rsi-group">
+        <h3>RSI 40 이하 <span>{{ us_rsi_groups.low|length }}종목</span></h3>
+        {% if us_rsi_groups.low %}
+        <div class="table-wrap">
+            <table>
+                <thead>
+                    <tr><th>순위</th><th>종목</th><th>시가총액</th><th>현재가</th><th>RSI</th></tr>
+                </thead>
+                <tbody>
+                    {% for item in us_rsi_groups.low %}
+                    <tr class="{% if (item.rank <= 10 and item.rsi < 35) or (item.rank > 10 and item.rsi < 30) %}rsi-signal-low{% endif %}">
+                        <td>{{ item.rank }}</td>
+                        <td>{{ item.name }}<br><small>{{ item.ticker }}</small></td>
+                        <td>{% if item.market_cap >= 1000000000000 %}${{ "%.2f"|format(item.market_cap / 1000000000000) }}T{% else %}${{ "%.1f"|format(item.market_cap / 1000000000) }}B{% endif %}</td>
+                        <td>${{ "%.2f"|format(item.price) }}</td>
+                        <td><span class="rsi-value rsi-low">{{ "%.2f"|format(item.rsi) }}</span></td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+        {% else %}
+        <p class="muted">조건에 해당하는 종목이 없습니다.</p>
+        {% endif %}
+    </section>
+
+    <section class="rsi-group">
+        <h3>RSI 60 이상 <span>{{ us_rsi_groups.high|length }}종목</span></h3>
+        {% if us_rsi_groups.high %}
+        <div class="table-wrap">
+            <table>
+                <thead>
+                    <tr><th>순위</th><th>종목</th><th>시가총액</th><th>현재가</th><th>RSI</th></tr>
+                </thead>
+                <tbody>
+                    {% for item in us_rsi_groups.high %}
+                    <tr class="{% if item.rsi >= 70 %}rsi-signal-high{% endif %}">
+                        <td>{{ item.rank }}</td>
+                        <td>{{ item.name }}<br><small>{{ item.ticker }}</small></td>
+                        <td>{% if item.market_cap >= 1000000000000 %}${{ "%.2f"|format(item.market_cap / 1000000000000) }}T{% else %}${{ "%.1f"|format(item.market_cap / 1000000000) }}B{% endif %}</td>
+                        <td>${{ "%.2f"|format(item.price) }}</td>
+                        <td><span class="rsi-value rsi-high">{{ "%.2f"|format(item.rsi) }}</span></td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+        {% else %}
+        <p class="muted">조건에 해당하는 종목이 없습니다.</p>
+        {% endif %}
+    </section>
+</div>
+{% endif %}
+
+</div>
+
+
+
+<div class="card">
+
 
 
 <div class="card">
