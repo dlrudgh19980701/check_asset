@@ -30,8 +30,7 @@ from crypto_price import (
 from stock_price import (
     get_current_price,
     get_usdkrw,
-    get_stock_name,
-    get_us_large_cap_rsi,
+    get_stock_name
 )
 
 app = Flask(__name__)
@@ -49,13 +48,6 @@ def home():
     eth_price = get_eth_price() or 0
 
     manual_assets = get_manual_assets()
-
-    try:
-        us_rsi_groups = get_us_large_cap_rsi()
-        us_rsi_error = None
-    except RuntimeError as error:
-        us_rsi_groups = {"low": [], "high": []}
-        us_rsi_error = str(error)
 
     stock_assets = []
 
@@ -311,11 +303,7 @@ def home():
 
         chart_labels=chart_labels,
 
-        chart_values=chart_values,
-
-        us_rsi_groups=us_rsi_groups,
-
-        us_rsi_error=us_rsi_error
+        chart_values=chart_values
 
     )
 
