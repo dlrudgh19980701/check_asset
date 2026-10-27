@@ -4,6 +4,7 @@ from flask import (
     request,
     redirect
 )
+import math
 
 from db import (
     init_db,
@@ -21,6 +22,7 @@ from db import (
     get_manual_asset,
     update_manual_asset_amount
 )
+from db import get_target_allocations, save_target_allocations
 
 from crypto_price import (
     get_btc_price,
@@ -275,6 +277,41 @@ def home():
 
     total_asset = portfolio_evaluation
 
+    saved_allocations = get_target_allocations()
+    target_percent_by_category = dict(saved_allocations)
+    allocation_categories = sorted(
+        set(category_totals) | set(target_percent_by_category)
+    )
+    allocation_rows = []
+
+    for category in allocation_categories:
+        current_value = category_totals.get(category, 0)
+        target_percent = target_percent_by_category.get(category, 0)
+        target_value = total_asset * target_percent / 100
+
+        allocation_rows.append({
+            "category": category,
+            "current_value": current_value,
+            "current_percent": (
+                current_value / total_asset * 100
+                if total_asset > 0 else 0
+            ),
+            "target_percent": target_percent,
+            "target_value": target_value,
+            "difference": target_value - current_value
+        })
+
+    target_chart_labels = [
+        category
+        for category, target_percent in saved_allocations
+        if target_percent > 0
+    ]
+    target_chart_values = [
+        target_percent
+        for _, target_percent in saved_allocations
+        if target_percent > 0
+    ]
+
     # -------------------------
     # render
     # -------------------------
@@ -303,9 +340,54 @@ def home():
 
         chart_labels=chart_labels,
 
-        chart_values=chart_values
+        chart_values=chart_values,
+
+        allocation_rows=allocation_rows,
+
+        target_chart_labels=target_chart_labels,
+
+        target_chart_values=target_chart_values,
+
+        allocation_error=request.args.get("allocation_error")
 
     )
+
+
+@app.route("/save_target_allocations", methods=["POST"])
+def save_target_allocations_route():
+
+    categories = request.form.getlist("category")
+    percentages = request.form.getlist("target_percent")
+    allocations = []
+    seen_categories = set()
+
+    try:
+        for category, raw_percent in zip(categories, percentages):
+            category = category.strip()
+            target_percent = float(raw_percent)
+
+            if not math.isfinite(target_percent) or target_percent < 0:
+                return redirect("/?allocation_error=invalid")
+
+            if not category:
+                if target_percent > 0:
+                    return redirect("/?allocation_error=invalid")
+                continue
+
+            if category in seen_categories:
+                return redirect("/?allocation_error=duplicate")
+
+            seen_categories.add(category)
+            allocations.append((category, target_percent))
+    except ValueError:
+        return redirect("/?allocation_error=invalid")
+
+    total_percent = sum(target_percent for _, target_percent in allocations)
+    if not allocations or abs(total_percent - 100) > 0.01:
+        return redirect("/?allocation_error=total")
+
+    save_target_allocations(allocations)
+    return redirect("/")
 
 
 # -------------------------

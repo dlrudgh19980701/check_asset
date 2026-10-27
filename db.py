@@ -66,6 +66,13 @@ def init_db():
             )
             """)
 
+            cursor.execute("""
+            CREATE TABLE IF NOT EXISTS target_allocations (
+                category TEXT PRIMARY KEY,
+                target_percent DOUBLE PRECISION NOT NULL
+            )
+            """)
+
 
 # =========================
 # 주식
@@ -257,3 +264,31 @@ def delete_manual_asset(asset_id):
             DELETE FROM manual_assets
             WHERE id=%s
             """, (asset_id,))
+
+
+def get_target_allocations():
+
+    with get_connection() as conn:
+        with conn.cursor() as cursor:
+
+            cursor.execute("""
+            SELECT category, target_percent
+            FROM target_allocations
+            ORDER BY category
+            """)
+
+            return cursor.fetchall()
+
+
+def save_target_allocations(allocations):
+
+    with get_connection() as conn:
+        with conn.cursor() as cursor:
+
+            cursor.execute("DELETE FROM target_allocations")
+
+            for category, target_percent in allocations:
+                cursor.execute("""
+                INSERT INTO target_allocations (category, target_percent)
+                VALUES (%s, %s)
+                """, (category, target_percent))
